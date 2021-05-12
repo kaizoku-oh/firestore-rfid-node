@@ -1,3 +1,6 @@
 [submodule "components/esp-idf-rc522"]
 	path = components/esp-idf-rc522
 	url = https://github.com/abobija/esp-idf-rc522.git
+[submodule "components/firestore"]
+	path = components/firestore
+	url = https://github.com/kaizoku-oh/firestore.git
