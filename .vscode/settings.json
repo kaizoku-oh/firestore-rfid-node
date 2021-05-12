@@ -1,6 +1,0 @@
-{
-  "files.associations": {
-    "rtcos_doxyfile": "makefile",
-    "rc522.h": "c"
-  }
-}
