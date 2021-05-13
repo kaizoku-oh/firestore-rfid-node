@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    name: Publish binaries
+    runs-on: ubuntu-latest
+
+    steps:
+    # Clone repo with its submodules
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    # Install python
+    - name: Set up Python
+      uses: actions/setup-python@v2
+    # Install PlatformIO
+    - name: Set up platformio
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+    # Check the firmware
+    - name: Check Firmware
+      run: |
+        pio check
+    # Build the firmware
+    - name: Build Firmware
+      env:
+        # Pass secrets as environment variables
+        WIFI_SSID: ${{ secrets.WIFI_SSID }}
+        WIFI_PASS: ${{ secrets.WIFI_PASS }}
+        FIRESTORE_FIREBASE_PROJECT_ID: ${{ secrets.FIRESTORE_FIREBASE_PROJECT_ID }}
+        FIRESTORE_FIREBASE_API_KEY: ${{ secrets.FIRESTORE_FIREBASE_API_KEY }}
+      run: |
+        pio run
+    # Upload firmware as a release asset
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: .pio/build/esp32dev/firmware.bin
+        asset_name: firmware.bin
+        tag: ${{ github.ref }}
+        overwrite: true

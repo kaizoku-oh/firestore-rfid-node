@@ -7,25 +7,31 @@
 
 #include "rc522.h"
 #include "firestore.h"
-#include "wifi_utils.h"
+#include "app_wifi.h"
+#include "app_ota.h"
 
-static void _send_data(uint8_t *);
-static void _tag_handler(uint8_t *);
-static void _firestore_task(void *);
+static void _app_main_send_data(uint8_t *);
+static void _app_main_tag_handler(uint8_t *);
+static void _app_main_firestore_task(void *);
 
-#define TAG                                      "APP_MAIN"
+#define APP_MAIN_TAG                             "APP_MAIN"
 
-#define ESP32_SPI_MISO_PIN                       19
-#define ESP32_SPI_MOSI_PIN                       23
-#define ESP32_SPI_SCK_PIN                        18
-#define ESP32_SPI_SDA_PIN                        21
+#define APP_MAIN_SPI_MISO_PIN                    19
+#define APP_MAIN_SPI_MOSI_PIN                    23
+#define APP_MAIN_SPI_SCK_PIN                     18
+#define APP_MAIN_SPI_SDA_PIN                     21
 
-#define SERIAL_NUMBER_MAX_SIZE                   5
+#define APP_MAIN_SERIAL_NUMBER_MAX_SIZE          5
 
-#define FIRESTORE_DOC_MAX_SIZE                   64
-#define FIRESTORE_COLLECTION_ID                  "devices"
-#define FIRESTORE_DOCUMENT_ID                    "rfid-node"
-#define FIRESTORE_DOCUMENT_EXAMPLE               "{"                                 \
+#define APP_MAIN_FIRESTORE_QUEUE_SIZE            10
+#define APP_MAIN_FIRESTORE_TASK_STACK_SIZE       10240
+#define APP_MAIN_FIRESTORE_TASK_PRIORITY         4
+#define APP_MAIN_FIRESTORE_PERIOD_MS             2500
+
+#define APP_MAIN_FIRESTORE_DOC_MAX_SIZE          64
+#define APP_MAIN_FIRESTORE_COLLECTION_ID         "devices"
+#define APP_MAIN_FIRESTORE_DOCUMENT_ID           "rfid-node"
+#define APP_MAIN_FIRESTORE_DOCUMENT_EXAMPLE      "{"                                 \
                                                    "\"fields\": {"                   \
                                                      "\"sn\": {"                     \
                                                        "\"stringValue\": ABCDEF1234" \
@@ -41,16 +47,16 @@ typedef enum
 
 static QueueHandle_t stQueue;
 static uint32_t u32DocLength;
-static char tcDoc[FIRESTORE_DOC_MAX_SIZE];
-static uint8_t tcu08SerialNumber[SERIAL_NUMBER_MAX_SIZE];
+static char tcDoc[APP_MAIN_FIRESTORE_DOC_MAX_SIZE];
+static uint8_t tcu08SerialNumber[APP_MAIN_SERIAL_NUMBER_MAX_SIZE];
 
 static const rc522_start_args_t stStartArgs =
 {
-  .miso_io  = ESP32_SPI_MISO_PIN,
-  .mosi_io  = ESP32_SPI_MOSI_PIN,
-  .sck_io   = ESP32_SPI_SCK_PIN,
-  .sda_io   = ESP32_SPI_SDA_PIN,
-  .callback = &_tag_handler,
+  .miso_io  = APP_MAIN_SPI_MISO_PIN,
+  .mosi_io  = APP_MAIN_SPI_MOSI_PIN,
+  .sck_io   = APP_MAIN_SPI_SCK_PIN,
+  .sda_io   = APP_MAIN_SPI_SDA_PIN,
+  .callback = &_app_main_tag_handler,
 };
 
 static const uint8_t ttu08KnownSerialNumbers[3][5] =
@@ -62,14 +68,20 @@ static const uint8_t ttu08KnownSerialNumbers[3][5] =
 
 void app_main(void)
 {
-  wifi_initialise();
-  wifi_wait_connected();
+  app_wifi_init();
+  app_wifi_wait();
+  app_ota_start();
 
-  stQueue = xQueueCreate(10, sizeof(rc522_event_t));
-  xTaskCreate(_firestore_task, "firestore", 10240, NULL, 4, NULL);
+  stQueue = xQueueCreate(APP_MAIN_FIRESTORE_QUEUE_SIZE, sizeof(rc522_event_t));
+  xTaskCreate(_app_main_firestore_task,
+              "firestore",
+              APP_MAIN_FIRESTORE_TASK_STACK_SIZE,
+              NULL,
+              APP_MAIN_FIRESTORE_TASK_PRIORITY,
+              NULL);
 }
 
-static void _tag_handler(uint8_t *pu08SN)
+static void _app_main_tag_handler(uint8_t *pu08SN)
 {
   rc522_event_t eEvent;
 
@@ -78,7 +90,7 @@ static void _tag_handler(uint8_t *pu08SN)
   xQueueSend(stQueue, &eEvent, portMAX_DELAY);
 }
 
-static void _firestore_task(void *pvParameter)
+static void _app_main_firestore_task(void *pvParameter)
 {
   rc522_event_t eEvent;
 
@@ -91,7 +103,7 @@ static void _firestore_task(void *pvParameter)
       switch(eEvent)
       {
       case TAG_DETECTED_EVENT:
-        ESP_LOGI(TAG,
+        ESP_LOGI(APP_MAIN_TAG,
                  "Detected Tag with serial-number: %X%X%X%X%X",
                  tcu08SerialNumber[0],
                  tcu08SerialNumber[1],
@@ -102,28 +114,28 @@ static void _firestore_task(void *pvParameter)
            (0 == memcmp(tcu08SerialNumber, ttu08KnownSerialNumbers[1], sizeof(tcu08SerialNumber))) ||
            (0 == memcmp(tcu08SerialNumber, ttu08KnownSerialNumbers[2], sizeof(tcu08SerialNumber))))
         {
-          ESP_LOGI(TAG, "Tag is recognized");
+          ESP_LOGI(APP_MAIN_TAG, "Tag is recognized");
         }
         else
         {
-          ESP_LOGW(TAG, "Tag is not recognized");
+          ESP_LOGW(APP_MAIN_TAG, "Tag is not recognized");
         }
         /* Sending data anyway */
-        _send_data(tcu08SerialNumber);
+        _app_main_send_data(tcu08SerialNumber);
         break;
       default:
-        ESP_LOGW(TAG, "Unknow event");
+        ESP_LOGW(APP_MAIN_TAG, "Unknow event");
         break;
       }
     }
     else
     {
-      ESP_LOGE(TAG, "Couldn't receive item from queue");
+      ESP_LOGE(APP_MAIN_TAG, "Couldn't receive item from queue");
     }
   }
 }
 
-static void _send_data(uint8_t *pu08SN)
+static void _app_main_send_data(uint8_t *pu08SN)
 {
   /* Format json document */
   u32DocLength = snprintf(tcDoc,
@@ -134,27 +146,27 @@ static void _send_data(uint8_t *pu08SN)
                           pu08SN[2],
                           pu08SN[3],
                           pu08SN[4]);
-  ESP_LOGI(TAG, "Document length after formatting: %d", u32DocLength);
-  ESP_LOGI(TAG, "Document content after formatting:\r\n%.*s", u32DocLength, tcDoc);
+  ESP_LOGI(APP_MAIN_TAG, "Document length after formatting: %d", u32DocLength);
+  ESP_LOGI(APP_MAIN_TAG, "Document content after formatting:\r\n%.*s", u32DocLength, tcDoc);
   if(u32DocLength > 0)
   {
     /* Update document in firestore or create it if it doesn't already exists */
-    if(FIRESTORE_OK == firestore_update_document(FIRESTORE_COLLECTION_ID,
-                                                 FIRESTORE_DOCUMENT_ID,
+    if(FIRESTORE_OK == firestore_update_document(APP_MAIN_FIRESTORE_COLLECTION_ID,
+                                                 APP_MAIN_FIRESTORE_DOCUMENT_ID,
                                                  tcDoc,
                                                  &u32DocLength))
     {
-      ESP_LOGI(TAG, "Document updated successfully");
-      ESP_LOGD(TAG, "Document length: %d", u32DocLength);
-      ESP_LOGD(TAG, "Document content:\r\n%.*s", u32DocLength, tcDoc);
+      ESP_LOGI(APP_MAIN_TAG, "Document updated successfully");
+      ESP_LOGD(APP_MAIN_TAG, "Document length: %d", u32DocLength);
+      ESP_LOGD(APP_MAIN_TAG, "Document content:\r\n%.*s", u32DocLength, tcDoc);
     }
     else
     {
-      ESP_LOGE(TAG, "Couldn't update document");
+      ESP_LOGE(APP_MAIN_TAG, "Couldn't update document");
     }
   }
   else
   {
-    ESP_LOGE(TAG, "Couldn't format document");
+    ESP_LOGE(APP_MAIN_TAG, "Couldn't format document");
   }
 }
