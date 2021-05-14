@@ -7,7 +7,9 @@
 
 #include "rc522.h"
 #include "firestore.h"
+
 #include "app_wifi.h"
+#include "app_time.h"
 #include "app_ota.h"
 
 static void _app_main_send_data(uint8_t *);
@@ -28,15 +30,18 @@ static void _app_main_firestore_task(void *);
 #define APP_MAIN_FIRESTORE_TASK_PRIORITY         4
 #define APP_MAIN_FIRESTORE_PERIOD_MS             2500
 
-#define APP_MAIN_FIRESTORE_DOC_MAX_SIZE          64
+#define APP_MAIN_FIRESTORE_DOC_MAX_SIZE          128
 #define APP_MAIN_FIRESTORE_COLLECTION_ID         "devices"
 #define APP_MAIN_FIRESTORE_DOCUMENT_ID           "rfid-node"
-#define APP_MAIN_FIRESTORE_DOCUMENT_EXAMPLE      "{"                                 \
-                                                   "\"fields\": {"                   \
-                                                     "\"sn\": {"                     \
-                                                       "\"stringValue\": ABCDEF1234" \
-                                                     "}"                             \
-                                                   "}"                               \
+#define APP_MAIN_FIRESTORE_DOCUMENT_EXAMPLE      "{"                                     \
+                                                   "\"fields\": {"                       \
+                                                     "\"sn\": {"                         \
+                                                       "\"stringValue\": ABCDEF1234"     \
+                                                     "},"                                \
+                                                     "\"timestamp\": {"                  \
+                                                       "\"integerValue\": 1621010203262" \
+                                                     "}"                                 \
+                                                   "}"                                   \
                                                  "}"
 
 typedef enum
@@ -70,7 +75,10 @@ void app_main(void)
 {
   app_wifi_init();
   app_wifi_wait();
+
   app_ota_start();
+
+  app_time_init();
 
   stQueue = xQueueCreate(APP_MAIN_FIRESTORE_QUEUE_SIZE, sizeof(rc522_event_t));
   xTaskCreate(_app_main_firestore_task,
@@ -137,17 +145,35 @@ static void _app_main_firestore_task(void *pvParameter)
 
 static void _app_main_send_data(uint8_t *pu08SN)
 {
+  int64_t s64Timestamp;
+
   /* Format json document */
-  u32DocLength = snprintf(tcDoc,
-                          sizeof(tcDoc),
-                          "{\"fields\":{\"sn\":{\"stringValue\":\"%X%X%X%X%X\"}}}",
-                          pu08SN[0],
-                          pu08SN[1],
-                          pu08SN[2],
-                          pu08SN[3],
-                          pu08SN[4]);
-  ESP_LOGI(APP_MAIN_TAG, "Document length after formatting: %d", u32DocLength);
-  ESP_LOGI(APP_MAIN_TAG, "Document content after formatting:\r\n%.*s", u32DocLength, tcDoc);
+  if(ESP_OK == app_time_get_ts(&s64Timestamp))
+  {
+    u32DocLength = snprintf(tcDoc,
+                            sizeof(tcDoc),
+                            "{\"fields\":{\"sn\":{\"stringValue\":\"%X%X%X%X%X\"},\"timestamp\":{\"integerValue\":%lld}}}",
+                            pu08SN[0],
+                            pu08SN[1],
+                            pu08SN[2],
+                            pu08SN[3],
+                            pu08SN[4],
+                            s64Timestamp);
+  }
+  else
+  {
+    ESP_LOGW(APP_MAIN_TAG, "Failed to get timestamp --> formatting data without timestamp");
+    u32DocLength = snprintf(tcDoc,
+                            sizeof(tcDoc),
+                            "{\"fields\":{\"sn\":{\"stringValue\":\"%X%X%X%X%X\"}}}",
+                            pu08SN[0],
+                            pu08SN[1],
+                            pu08SN[2],
+                            pu08SN[3],
+                            pu08SN[4]);
+  }
+  ESP_LOGD(APP_MAIN_TAG, "Document length after formatting: %d", u32DocLength);
+  ESP_LOGD(APP_MAIN_TAG, "Document content after formatting:\r\n%.*s", u32DocLength, tcDoc);
   if(u32DocLength > 0)
   {
     /* Update document in firestore or create it if it doesn't already exists */

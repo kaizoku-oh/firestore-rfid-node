@@ -49,30 +49,30 @@ static esp_err_t _app_ota_http_event_handler(esp_http_client_event_t *pstEvent)
   switch(pstEvent->event_id)
   {
   case HTTP_EVENT_ERROR:
-    ESP_LOGI(APP_OTA_TAG, "HTTP error");
+    ESP_LOGD(APP_OTA_TAG, "HTTP error");
     break;
   case HTTP_EVENT_ON_CONNECTED:
-    ESP_LOGI(APP_OTA_TAG, "HTTP connected to server");
+    ESP_LOGD(APP_OTA_TAG, "HTTP connected to server");
     break;
   case HTTP_EVENT_HEADERS_SENT:
-    ESP_LOGI(APP_OTA_TAG, "All HTTP headers are sent to server");
+    ESP_LOGD(APP_OTA_TAG, "All HTTP headers are sent to server");
     break;
   case HTTP_EVENT_ON_HEADER:
-    ESP_LOGI(APP_OTA_TAG, "Received HTTP header from server");
+    ESP_LOGD(APP_OTA_TAG, "Received HTTP header from server");
     printf("%.*s", pstEvent->data_len, (char*)pstEvent->data);
     break;
   case HTTP_EVENT_ON_DATA:
-    ESP_LOGI(APP_OTA_TAG, "Received data from server, len=%d", pstEvent->data_len);
+    ESP_LOGD(APP_OTA_TAG, "Received data from server, len=%d", pstEvent->data_len);
     if(!esp_http_client_is_chunked_response(pstEvent->client))
     {
       strncpy(tcHttpRcvBuffer, (char*)pstEvent->data, pstEvent->data_len);
     }
     break;
   case HTTP_EVENT_ON_FINISH:
-    ESP_LOGI(APP_OTA_TAG, "HTTP session is finished");
+    ESP_LOGD(APP_OTA_TAG, "HTTP session is finished");
     break;
   case HTTP_EVENT_DISCONNECTED:
-    ESP_LOGI(APP_OTA_TAG, "HTTP connection is closed");
+    ESP_LOGD(APP_OTA_TAG, "HTTP connection is closed");
     break;
   }
   return ESP_OK;
@@ -99,7 +99,8 @@ static char* _app_ota_get_download_url(void)
   s32RetVal = esp_http_client_perform(pstClient);
   if(ESP_OK == s32RetVal)
   {
-    ESP_LOGI(APP_OTA_TAG, "Status = %d, content_length = %d",
+    ESP_LOGD(APP_OTA_TAG,
+             "Status = %d, content_length = %d",
              esp_http_client_get_status_code(pstClient),
              esp_http_client_get_content_length(pstClient));
     s32HttpCode = esp_http_client_get_status_code(pstClient);
@@ -109,7 +110,7 @@ static char* _app_ota_get_download_url(void)
     }
     else if(200 == s32HttpCode)
     {
-      ESP_LOGI(APP_OTA_TAG, "tcHttpRcvBuffer: %s\n", tcHttpRcvBuffer);
+      ESP_LOGD(APP_OTA_TAG, "tcHttpRcvBuffer: %s\n", tcHttpRcvBuffer);
       /* parse the http json respose */
       pstJsonObject = cJSON_Parse(tcHttpRcvBuffer);
       if(pstJsonObject == NULL)
@@ -122,7 +123,7 @@ static char* _app_ota_get_download_url(void)
         if(cJSON_IsString(pstJsonDownloadUrl) && (pstJsonDownloadUrl->valuestring != NULL))
         {
           pcDownloadUrl = pstJsonDownloadUrl->valuestring;
-          ESP_LOGI(APP_OTA_TAG, "download_url length: %d", strlen(pcDownloadUrl));
+          ESP_LOGD(APP_OTA_TAG, "download_url length: %d", strlen(pcDownloadUrl));
         }
         else
         {
@@ -148,8 +149,8 @@ static void _app_ota_check_update_task(void *pvParameter)
     pcDownloadUrl = _app_ota_get_download_url();
     if(pcDownloadUrl != NULL)
     {
-      ESP_LOGI(APP_OTA_TAG, "download_url: %s", pcDownloadUrl);
-      ESP_LOGI(APP_OTA_TAG, "Downloading and installing new firmware");
+      ESP_LOGD(APP_OTA_TAG, "download_url: %s", pcDownloadUrl);
+      ESP_LOGD(APP_OTA_TAG, "Downloading and installing new firmware");
       esp_http_client_config_t ota_client_config =
       {
         .url = pcDownloadUrl,
