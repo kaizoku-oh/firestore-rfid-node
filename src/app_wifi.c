@@ -28,6 +28,8 @@ typedef struct
 }wifi_ctx_t;
 
 static wifi_ctx_t stCtx;
+esp_event_handler_instance_t pvInstanceAnyId;
+esp_event_handler_instance_t pvInstanceGotIP;
 
 static void _app_wifi_event_handler(void* pvArg,
                                     esp_event_base_t pcEventBase,
@@ -42,15 +44,18 @@ static void _app_wifi_event_handler(void* pvArg,
   {
     if(stCtx.u08RetryCount < APP_WIFI_MAXIMUM_RETRY)
     {
-      esp_wifi_connect();
       stCtx.u08RetryCount++;
       ESP_LOGW(APP_WIFI_TAG, "Retrying to connect to the AP");
+      esp_wifi_connect();
     }
     else
     {
       xEventGroupSetBits(stCtx.stWifiEventGroup, APP_WIFI_FAIL_BIT);
     }
-    ESP_LOGE(APP_WIFI_TAG,"Connection to the AP fail");
+  }
+  else if((WIFI_EVENT == pcEventBase) && (WIFI_EVENT_STA_CONNECTED == s32EventId))
+  {
+    ESP_LOGI(APP_WIFI_TAG, "Station connected to AP");
   }
   else if((IP_EVENT == pcEventBase) && (IP_EVENT_STA_GOT_IP == s32EventId))
   {
@@ -84,11 +89,11 @@ void app_wifi_init(void)
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
                                              ESP_EVENT_ANY_ID,
                                              &_app_wifi_event_handler,
-                                             NULL));
+                                             &pvInstanceAnyId));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
                                              IP_EVENT_STA_GOT_IP,
                                              &_app_wifi_event_handler,
-                                             NULL));
+                                             &pvInstanceGotIP));
   wifi_config_t wifi_config =
   {
     .sta =
@@ -105,7 +110,7 @@ void app_wifi_init(void)
   };
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
   ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
-  ESP_ERROR_CHECK(esp_wifi_start() );
+  ESP_ERROR_CHECK(esp_wifi_start());
   ESP_LOGD(APP_WIFI_TAG, "Finished wifi initialization");
 }
 
@@ -133,13 +138,9 @@ void app_wifi_wait(void)
   }
   else
   {
-    ESP_LOGE(APP_WIFI_TAG, "Wifi Timeout");
+    ESP_LOGE(APP_WIFI_TAG, "Unexpected WiFi event");
   }
-  ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT,
-                                               IP_EVENT_STA_GOT_IP,
-                                               &_app_wifi_event_handler));
-  ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
-                                               ESP_EVENT_ANY_ID,
-                                               &_app_wifi_event_handler));
+  ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, pvInstanceGotIP));
+  ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, pvInstanceAnyId));
   vEventGroupDelete(stCtx.stWifiEventGroup);
 }
