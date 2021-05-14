@@ -18,12 +18,14 @@ To get started:
 1. Install [PlatformIO Extension for vscode](https://platformio.org/install/ide?install=vscode)
 2. Create a new project using ESP-IDF framework
 3. Under the root of the project create a new directory called [components](https://docs.platformio.org/en/latest/frameworks/espidf.html#esp-idf-components)
-4. Clone this repo
+4. Clone this repo with its submodules
 ``` bash
-$ git clone https://github.com/kaizoku-oh/firestore-rfid-node.git --recursive
+$ git clone https://github.com/kaizoku-oh/firestore-rfid-node.git
+$ cd firestore-rfid-node
+$ git submodule update --init
 ```
 5. To avoid exposing sensitive data in the code we'll store them in environment variables that'll be when building the project.
-#### Window (Powershell)
+#### Windows/Linux (PowerShell 7)
 ``` powershell
 # Set local environment variables
 > $env:WIFI_SSID = '"TYPE_YOUR_WIFI_SSID_HERE"'
