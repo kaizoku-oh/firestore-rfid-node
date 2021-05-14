@@ -28,6 +28,7 @@ static void _app_main_firestore_task(void *);
 #define APP_MAIN_FIRESTORE_QUEUE_SIZE            10
 #define APP_MAIN_FIRESTORE_TASK_STACK_SIZE       10240
 #define APP_MAIN_FIRESTORE_TASK_PRIORITY         4
+#define APP_MAIN_RC522_TASK_PRIORITY             5
 #define APP_MAIN_FIRESTORE_PERIOD_MS             2500
 
 #define APP_MAIN_FIRESTORE_DOC_MAX_SIZE          128
@@ -62,6 +63,7 @@ static const rc522_start_args_t stStartArgs =
   .sck_io   = APP_MAIN_SPI_SCK_PIN,
   .sda_io   = APP_MAIN_SPI_SDA_PIN,
   .callback = &_app_main_tag_handler,
+  .task_priority = APP_MAIN_RC522_TASK_PRIORITY
 };
 
 static const uint8_t ttu08KnownSerialNumbers[3][5] =

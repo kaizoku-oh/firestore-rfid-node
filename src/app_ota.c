@@ -25,7 +25,7 @@
 #define APP_OTA_HTTP_APP_RX_BUFFER_SIZE          1024
 
 #define APP_OTA_TASK_STACK_SIZE                  8192
-#define APP_OTA_TASK_PRIORITY                    5
+#define APP_OTA_TASK_PRIORITY                    6
 #define APP_OTA_TASK_PERIOD_MS                   60*1000
 
 static const char *pcApiUrl = APP_OTA_BASE_URL APP_OTA_ENDPOINT
