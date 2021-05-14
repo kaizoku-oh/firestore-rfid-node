@@ -80,8 +80,6 @@ void app_main(void)
 
   app_ota_start();
 
-  app_time_init();
-
   stQueue = xQueueCreate(APP_MAIN_FIRESTORE_QUEUE_SIZE, sizeof(rc522_event_t));
   xTaskCreate(_app_main_firestore_task,
               "firestore",
@@ -104,6 +102,7 @@ static void _app_main_firestore_task(void *pvParameter)
 {
   rc522_event_t eEvent;
 
+  app_time_init();
   firestore_init();
   rc522_start(stStartArgs);
   while(1)
