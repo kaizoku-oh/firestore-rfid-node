@@ -44,18 +44,20 @@ static void _app_wifi_event_handler(void* pvArg,
     {
       esp_wifi_connect();
       stCtx.u08RetryCount++;
-      ESP_LOGD(APP_WIFI_TAG, "Retrying to connect to the AP");
+      ESP_LOGW(APP_WIFI_TAG, "Retrying to connect to the AP");
     }
     else
     {
       xEventGroupSetBits(stCtx.stWifiEventGroup, APP_WIFI_FAIL_BIT);
     }
-    ESP_LOGD(APP_WIFI_TAG,"Connection to the AP fail");
+    ESP_LOGE(APP_WIFI_TAG,"Connection to the AP fail");
   }
   else if((IP_EVENT == pcEventBase) && (IP_EVENT_STA_GOT_IP == s32EventId))
   {
     stCtx.pstIpEvent = (ip_event_got_ip_t*) pvEventData;
-    ESP_LOGI(APP_WIFI_TAG, "Connected to WiFi, got IP:" IPSTR, IP2STR(&stCtx.pstIpEvent->ip_info.ip));
+    ESP_LOGI(APP_WIFI_TAG,
+             "Connected to WiFi, got IP:" IPSTR,
+             IP2STR(&stCtx.pstIpEvent->ip_info.ip));
     stCtx.u08RetryCount = 0;
     xEventGroupSetBits(stCtx.stWifiEventGroup, APP_WIFI_CONNECTED_BIT);
   }
@@ -109,7 +111,7 @@ void app_wifi_init(void)
 
 void app_wifi_wait(void)
 {
-  ESP_LOGD(APP_WIFI_TAG, "Waiting for wifi connection");
+  ESP_LOGI(APP_WIFI_TAG, "Waiting for wifi connection");
   stCtx.u32EventBits = xEventGroupWaitBits(stCtx.stWifiEventGroup,
                                            APP_WIFI_CONNECTED_BIT | APP_WIFI_FAIL_BIT,
                                            pdFALSE,
@@ -124,7 +126,7 @@ void app_wifi_wait(void)
   }
   else if(stCtx.u32EventBits & APP_WIFI_FAIL_BIT)
   {
-    ESP_LOGD(APP_WIFI_TAG,
+    ESP_LOGE(APP_WIFI_TAG,
              "Failed to connect to SSID:%s, password:%s",
              WIFI_SSID,
              WIFI_PASS);
