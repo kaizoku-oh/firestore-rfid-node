@@ -148,7 +148,7 @@ static void _app_main_send_data(uint8_t *pu08SN)
   int64_t s64Timestamp;
 
   /* Format json document */
-  if(ESP_OK == app_time_get_ts(&s64Timestamp))
+  if(ESP_OK == app_time_get_timestamp(&s64Timestamp))
   {
     u32DocLength = snprintf(tcDoc,
                             sizeof(tcDoc),

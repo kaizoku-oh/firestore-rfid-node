@@ -4,6 +4,6 @@
 #include <esp_err.h>
 
 void app_time_init(void);
-esp_err_t app_time_get_ts(int64_t *);
+esp_err_t app_time_get_timestamp(int64_t *);
 
 #endif /* _APP_TIME_H_ */

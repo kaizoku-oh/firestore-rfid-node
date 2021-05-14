@@ -10,14 +10,14 @@
 #define APP_TIME_RETRIES_COUNT                   16
 #define APP_TIME_BUFF_MAX_SIZE                   128
 
-esp_err_t s32TimeStatus = ESP_FAIL;
 static time_t stNow;
 static uint8_t u08Retries;
 static struct tm stTimeInfo;
 static char tcTimeFormatBuff[APP_TIME_BUFF_MAX_SIZE];
 
-void app_time_init()
+static esp_err_t _app_time_init(void)
 {
+  esp_err_t s32RetVal;
   sntp_sync_status_t eStatus;
 
   time(&stNow);
@@ -44,6 +44,7 @@ void app_time_init()
     }
     if(SNTP_SYNC_STATUS_COMPLETED == eStatus)
     {
+      s32RetVal = ESP_OK;
       /* Update with new time value */
       time(&stNow);
       localtime_r(&stNow, &stTimeInfo);
@@ -52,29 +53,34 @@ void app_time_init()
       strftime(tcTimeFormatBuff, sizeof(tcTimeFormatBuff), "%c", &stTimeInfo);
       ESP_LOGI(APP_TIME_TAG, "Time is set successfully");
       ESP_LOGI(APP_TIME_TAG, "The current date/time in UTC is: %s", tcTimeFormatBuff);
-      s32TimeStatus = ESP_OK;
     }
     else
     {
+      s32RetVal = ESP_FAIL;
       ESP_LOGE(APP_TIME_TAG, "Failed to get time from SNTP server");
-      s32TimeStatus = ESP_FAIL;
     }
   }
   else
   {
-    ESP_LOGI(APP_TIME_TAG, "Time is already set");
-    s32TimeStatus = ESP_OK;
+    s32RetVal = ESP_OK;
+    ESP_LOGD(APP_TIME_TAG, "Time is already set");
   }
+  return s32RetVal;
 }
 
-esp_err_t app_time_get_ts(int64_t *ps64Timestamp)
+void app_time_init(void)
+{
+  _app_time_init();
+}
+
+esp_err_t app_time_get_timestamp(int64_t *ps64Timestamp)
 {
   esp_err_t s32RetVal;
   struct timeval stTvNow;
 
   if(ps64Timestamp)
   {
-    if(ESP_OK == s32TimeStatus)
+    if(ESP_OK == _app_time_init())
     {
       s32RetVal = (0 == gettimeofday(&stTvNow, NULL))?ESP_OK:ESP_FAIL;
       *ps64Timestamp = (int64_t)stTvNow.tv_sec * 1000LL + (int64_t)stTvNow.tv_usec / 1000LL;
@@ -82,13 +88,13 @@ esp_err_t app_time_get_ts(int64_t *ps64Timestamp)
     }
     else
     {
+      ESP_LOGE(APP_TIME_TAG, "Failed to get timestamp: Time is not set");
       s32RetVal = ESP_FAIL;
     }
   }
   else
   {
     s32RetVal = ESP_ERR_INVALID_ARG;
-    ESP_LOGE(APP_TIME_TAG, "Failed to get timestamp");
   }
   return s32RetVal;
 }
